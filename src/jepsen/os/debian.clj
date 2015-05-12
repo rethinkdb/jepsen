@@ -59,6 +59,7 @@
 
       (setup-hostfile!)
 
+;      (c/su (c/exec :apt-get :update))
       (c/su
         ; Packages!
         (install [:wget

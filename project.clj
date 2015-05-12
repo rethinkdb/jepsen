@@ -50,6 +50,12 @@
                     [[verschlimmbesserung "0.1.1"]]
                     :source-paths ["etcd/src"]
                     :test-paths ["etcd/test"]}
+             :rdb {:dependencies
+                    [[rethinkdb "0.7.39"]
+                     [cheshire "5.4.0"]
+                     [slingshot "0.12.2"]]
+                    :source-paths ["rdb/src"]
+                    :test-paths ["rdb/test"]}
              :datomic {:dependencies
                        [[com.datomic/datomic-pro "0.9.4707"
                          :exclusions [org.apache.httpcomponents/httpclient
