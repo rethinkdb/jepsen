@@ -19,66 +19,6 @@
             [rethinkdb.core :refer [connect close]]
             [rethinkdb.query :as r]))
 
-;; (def binary "/opt/etcd/bin/etcd")
-;; (def pidfile "/var/run/etcd.pid")
-;; (def data-dir "/var/lib/etcd")
-;; (def log-file "/var/log/etcd.log")
-
-;; (defn peer-addr [node]
-;;   (str (name node) ":2380"))
-
-;; (defn addr [node]
-;;   (str (name node) ":2380"))
-
-;; (defn cluster-url [node]
-;;   (str "http://" (name node) ":2380"))
-
-;; (defn listen-client-url [node]
-;;   (str "http://" (name node) ":2379"))
-
-;; (defn cluster-info [node]
-;;   (str (name node) "=http://" (name node) ":2380"))
-
-;; (defn peers
-;;   "The command-line peer list for an etcd cluster."
-;;   [test]
-;;   (->> test
-;;        :nodes
-;;        (map cluster-info)
-;;        (str/join ",")))
-
-;; (defn running?
-;;   "Is etcd running?"
-;;   []
-;;   (try
-;;     (c/exec :start-stop-daemon :--status
-;;             :--pidfile pidfile
-;;             :--exec binary)
-;;     true
-;;     (catch RuntimeException _ false)))
-
-;; (defn start-etcd!
-;;   [test node]
-;;   (info node "starting etcd")
-;;   (c/exec :start-stop-daemon :--start
-;;           :--background
-;;           :--make-pidfile
-;;           :--pidfile        pidfile
-;;           :--chdir          "/opt/etcd"
-;;           :--exec           binary
-;;           :--no-close
-;;           :--
-;;           :-data-dir        data-dir
-;;           :-name            (name node)
-;;           :-advertise-client-urls (cluster-url node)
-;;           :-listen-peer-urls (cluster-url node)
-;;           :-listen-client-urls (listen-client-url node)
-;;           :-initial-advertise-peer-urls (cluster-url node)
-;;           :-initial-cluster-state "new"
-;;           :-initial-cluster (peers test)
-;;           :>>               log-file
-;;           (c/lit "2>&1")))
-
 (defn copy-from-home [file]
   (c/scp* (str (System/getProperty "user.home") "/" file) "/home/ubuntu"))
 
@@ -97,7 +37,9 @@ chmod a+x rethinkdb
 nohup ./rethinkdb --bind all \\
                   -j n1:29015 -j n2:29015 -j n3:29015 -j n4:29015 -j n5:29015 \\
                   >1.out 2>2.out &
-sleep 5
+tail -n+0 -F 1.out \\
+  | grep --line-buffered '^Server ready' \\
+  | while read line; do pkill -P $$ tail; exit 0; done
 "})
       (info node "Starting DONE!")
       (if (= node :n1)
