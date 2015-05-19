@@ -26,7 +26,11 @@
                  :model     (model/cas-register)
                  :checker   (checker/compose {:html   timeline/html
                                               :linear checker/linearizable})
-                 :nemesis   (nemesis/partition-random-halves)
+                 ;; Point
+                 ;; We don't use random halves because we want to make
+                 ;; sure we can get a write majority for a particular
+                 ;; machine.
+                 :nemesis   (nemesis/partition-halves)
                  :generator (gen/phases
                               (->> gen/cas
                                    (gen/delay 1)
@@ -39,7 +43,7 @@
                                    (gen/time-limit 20))
                               (gen/nemesis
                                 (gen/once {:type :info :f :stop}))
-;                              (gen/sleep 10)
+                              ;; (gen/sleep 10)
                               (gen/clients
                                 (gen/once {:type :invoke :f :read})))))]
     (is (:valid? (:results test)))

@@ -31,15 +31,19 @@
         (copy-from-home file)
         (info node (str "Copying ~/" file " DONE!")))
       (info node "Starting...")
+      ;; TODO: detect server failing to start.
       (c/ssh* {:cmd "
 rm -rf rethinkdb_data
 chmod a+x rethinkdb
-nohup ./rethinkdb --bind all \\
+nohup ./rethinkdb -n `hostname` \\
+                  --bind all \\
                   -j n1:29015 -j n2:29015 -j n3:29015 -j n4:29015 -j n5:29015 \\
                   >1.out 2>2.out &
+sleep 1
 tail -n+0 -F 1.out \\
   | grep --line-buffered '^Server ready' \\
   | while read line; do pkill -P $$ tail; exit 0; done
+sleep 1
 "})
       (info node "Starting DONE!")
       (if (= node :n1)
@@ -48,8 +52,19 @@ tail -n+0 -F 1.out \\
           (info node (str `(connect :host ~(name node) :port 28015)))
           (with-open [conn (connect :host (name node) :port 28015)]
             (r/run (r/db-create "jepsen") conn)
-            (r/run (r/table-create (r/db "jepsen") "cas") conn)
-            (r/run (r/insert (r/table (r/db "jepsen") "cas") {:id 0 :val nil}) conn))
+            (r/run (r/table-create (r/db "jepsen") "cas" {:replicas 5}) conn)
+            (r/run (r/insert (r/table (r/db "jepsen") "cas") {:id 0 :val nil}) conn)
+            (pr (r/run
+                  (r/update
+                   (r/table (r/db "rethinkdb") "table_config")
+                   ;; Point 1
+                   ;; {:write_acks "single"})
+                   {:shards [{:primary_replica "n5"
+                              :replicas ["n1" "n2" "n3" "n4" "n5"]}]})
+                  conn))
+            (r/run
+              (rethinkdb.query-builder/term :WAIT [(r/table (r/db "jepsen") "cas")] {})
+              conn))
           (info node "Creating table DONE!"))
         (info node "Not creating table.")))
     (teardown! [_ test node]
@@ -75,16 +90,22 @@ fi
     (let [conn (connect :host (name node) :port 28015)]
       (info node "Connecting CAS Client DONE!")
       (assoc this :conn conn :node node)))
-  ;;    [client (v/connect (str "http://" (name node) ":2379"))]
-  ;;      (v/reset! client k (json/generate-string nil))
-  ;;      (assoc this :client client)))
 
   (invoke! [this test op]
     (let [fail (if (= :read (:f op)) :fail :info)
-          row (r/get (r/table (r/db "jepsen") "cas") 0)]
+          row (r/get
+               (rethinkdb.query-builder/term
+                :TABLE
+                [(r/db "jepsen") "cas"]
+                ;; Point 2
+                {:use_outdated false})
+               0)]
       (try+
        (case (:f op)
-         :read (assoc op :type :ok :value (r/run (r/get-field row "val") (:conn this)))
+         :read (assoc
+                op
+                :type :ok
+                :value (r/run (r/get-field row "val") (:conn this)))
          :write (do (r/run
                       (r/update row {:val (:value op)})
                       (:conn this))

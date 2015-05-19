@@ -34,6 +34,11 @@
   [coll]
   (split-at (Math/floor (/ (count coll) 2)) coll))
 
+(defn atomize
+  "Split all the nodes from each other."
+  [coll]
+  (map (fn [x] [x]) coll))
+
 (defn split-one
   "Split one node off from the rest"
   [coll]
@@ -104,6 +109,10 @@
   []
   (partitioner (comp complete-grudge split-one)))
 
+(defn partition-all-nodes
+  "Isolate all nodes from each other."
+  []
+  (partitioner (comp complete-grudge atomize)))
 
 (defn set-time!
   "Set the local node time in POSIX seconds."
